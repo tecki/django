@@ -20,6 +20,7 @@ from django.forms.widgets import (
 )
 from django.utils import six
 from django.utils.encoding import force_text, smart_text
+from django.utils.metaclass import Meta
 from django.utils.text import capfirst, get_text_list
 from django.utils.translation import ugettext, ugettext_lazy as _
 
@@ -188,77 +189,6 @@ class ModelFormOptions(object):
         self.help_texts = getattr(options, 'help_texts', None)
         self.error_messages = getattr(options, 'error_messages', None)
         self.field_classes = getattr(options, 'field_classes', None)
-
-
-class ModelFormBase(DeclarativeFieldsBase):
-    def __init_subclass__(cls):
-        formfield_callback = None
-        for b in cls.__bases__:
-            if hasattr(b, 'Meta') and hasattr(b.Meta, 'formfield_callback'):
-                formfield_callback = b.Meta.formfield_callback
-                break
-
-        if hasattr(cls, 'formfield_callback'):
-            formfield_callback = cls.formfield_callback
-            del cls.formfield_callback
-
-        super(ModelFormBase, cls).__init_subclass__()
-
-        if cls.__bases__ == (BaseModelForm,):
-            return
-
-        opts = cls._meta = ModelFormOptions(getattr(cls, 'Meta', None))
-
-        # We check if a string was passed to `fields` or `exclude`,
-        # which is likely to be a mistake where the user typed ('foo') instead
-        # of ('foo',)
-        for opt in ['fields', 'exclude', 'localized_fields']:
-            value = getattr(opts, opt)
-            if isinstance(value, six.string_types) and value != ALL_FIELDS:
-                msg = ("%(model)s.Meta.%(opt)s cannot be a string. "
-                       "Did you mean to type: ('%(value)s',)?" % {
-                           'model': cls.__name__,
-                           'opt': opt,
-                           'value': value,
-                       })
-                raise TypeError(msg)
-
-        if opts.model:
-            # If a model is defined, extract form fields from it.
-            if opts.fields is None and opts.exclude is None:
-                raise ImproperlyConfigured(
-                    "Creating a ModelForm without either the 'fields' attribute "
-                    "or the 'exclude' attribute is prohibited; form %s "
-                    "needs updating." % name
-                )
-
-            if opts.fields == ALL_FIELDS:
-                # Sentinel for fields_for_model to indicate "get the list of
-                # fields from the model"
-                opts.fields = None
-
-            fields = fields_for_model(opts.model, opts.fields, opts.exclude,
-                                      opts.widgets, formfield_callback,
-                                      opts.localized_fields, opts.labels,
-                                      opts.help_texts, opts.error_messages,
-                                      opts.field_classes)
-
-            # make sure opts.fields doesn't specify an invalid field
-            none_model_fields = [k for k, v in six.iteritems(fields) if not v]
-            missing_fields = (set(none_model_fields) -
-                              set(cls.declared_fields.keys()))
-            if missing_fields:
-                message = 'Unknown field(s) (%s) specified for %s'
-                message = message % (', '.join(missing_fields),
-                                     opts.model.__name__)
-                raise FieldError(message)
-            # Override default model fields with any custom declared ones
-            # (plus, include all the other declared fields).
-            fields.update(cls.declared_fields)
-        else:
-            fields = cls.declared_fields
-
-        cls.base_fields = fields
 
 
 class BaseModelForm(BaseForm):
@@ -456,7 +386,78 @@ class BaseModelForm(BaseForm):
     save.alters_data = True
 
 
-class ModelForm(ModelFormBase, BaseModelForm):
+class ModelForm(DeclarativeFieldsBase, BaseModelForm):
+    def __init_subclass__(cls):
+        formfield_callback = None
+        for b in cls.__bases__:
+            if hasattr(b, 'Meta') and hasattr(b.Meta, 'formfield_callback'):
+                formfield_callback = b.Meta.formfield_callback
+                break
+
+        if hasattr(cls, 'formfield_callback'):
+            formfield_callback = cls.formfield_callback
+            del cls.formfield_callback
+
+        super(ModelForm, cls).__init_subclass__()
+
+        if cls.__bases__ == (BaseModelForm,):
+            return
+
+        opts = cls._meta = ModelFormOptions(getattr(cls, 'Meta', None))
+
+        # We check if a string was passed to `fields` or `exclude`,
+        # which is likely to be a mistake where the user typed ('foo') instead
+        # of ('foo',)
+        for opt in ['fields', 'exclude', 'localized_fields']:
+            value = getattr(opts, opt)
+            if isinstance(value, six.string_types) and value != ALL_FIELDS:
+                msg = ("%(model)s.Meta.%(opt)s cannot be a string. "
+                       "Did you mean to type: ('%(value)s',)?" % {
+                           'model': cls.__name__,
+                           'opt': opt,
+                           'value': value,
+                       })
+                raise TypeError(msg)
+
+        if opts.model:
+            # If a model is defined, extract form fields from it.
+            if opts.fields is None and opts.exclude is None:
+                raise ImproperlyConfigured(
+                    "Creating a ModelForm without either the 'fields' attribute "
+                    "or the 'exclude' attribute is prohibited; form %s "
+                    "needs updating." % cls.__name__
+                )
+
+            if opts.fields == ALL_FIELDS:
+                # Sentinel for fields_for_model to indicate "get the list of
+                # fields from the model"
+                opts.fields = None
+
+            fields = fields_for_model(opts.model, opts.fields, opts.exclude,
+                                      opts.widgets, formfield_callback,
+                                      opts.localized_fields, opts.labels,
+                                      opts.help_texts, opts.error_messages,
+                                      opts.field_classes)
+
+            # make sure opts.fields doesn't specify an invalid field
+            none_model_fields = [k for k, v in six.iteritems(fields) if not v]
+            missing_fields = (set(none_model_fields) -
+                              set(cls.declared_fields.keys()))
+            if missing_fields:
+                message = 'Unknown field(s) (%s) specified for %s'
+                message = message % (', '.join(missing_fields),
+                                     opts.model.__name__)
+                raise FieldError(message)
+            # Override default model fields with any custom declared ones
+            # (plus, include all the other declared fields).
+            fields.update(cls.declared_fields)
+        else:
+            fields = cls.declared_fields
+
+        cls.base_fields = fields
+
+
+class ModelFormMetaclass(Meta):
     pass
 
 
