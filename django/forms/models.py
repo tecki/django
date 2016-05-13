@@ -12,7 +12,7 @@ from django.core.exceptions import (
     NON_FIELD_ERRORS, FieldError, ImproperlyConfigured, ValidationError,
 )
 from django.forms.fields import ChoiceField, Field
-from django.forms.forms import BaseForm, DeclarativeFieldsMetaclass
+from django.forms.forms import BaseForm, DeclarativeFieldsBase
 from django.forms.formsets import BaseFormSet, formset_factory
 from django.forms.utils import ErrorList
 from django.forms.widgets import (
@@ -190,22 +190,24 @@ class ModelFormOptions(object):
         self.field_classes = getattr(options, 'field_classes', None)
 
 
-class ModelFormMetaclass(DeclarativeFieldsMetaclass):
-    def __new__(mcs, name, bases, attrs):
-        base_formfield_callback = None
-        for b in bases:
+class ModelFormBase(DeclarativeFieldsBase):
+    def __init_subclass__(cls):
+        formfield_callback = None
+        for b in cls.__bases__:
             if hasattr(b, 'Meta') and hasattr(b.Meta, 'formfield_callback'):
-                base_formfield_callback = b.Meta.formfield_callback
+                formfield_callback = b.Meta.formfield_callback
                 break
 
-        formfield_callback = attrs.pop('formfield_callback', base_formfield_callback)
+        if hasattr(cls, 'formfield_callback'):
+            formfield_callback = cls.formfield_callback
+            del cls.formfield_callback
 
-        new_class = super(ModelFormMetaclass, mcs).__new__(mcs, name, bases, attrs)
+        super(ModelFormBase, cls).__init_subclass__()
 
-        if bases == (BaseModelForm,):
-            return new_class
+        if cls.__bases__ == (BaseModelForm,):
+            return
 
-        opts = new_class._meta = ModelFormOptions(getattr(new_class, 'Meta', None))
+        opts = cls._meta = ModelFormOptions(getattr(cls, 'Meta', None))
 
         # We check if a string was passed to `fields` or `exclude`,
         # which is likely to be a mistake where the user typed ('foo') instead
@@ -215,7 +217,7 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
             if isinstance(value, six.string_types) and value != ALL_FIELDS:
                 msg = ("%(model)s.Meta.%(opt)s cannot be a string. "
                        "Did you mean to type: ('%(value)s',)?" % {
-                           'model': new_class.__name__,
+                           'model': cls.__name__,
                            'opt': opt,
                            'value': value,
                        })
@@ -244,7 +246,7 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
             # make sure opts.fields doesn't specify an invalid field
             none_model_fields = [k for k, v in six.iteritems(fields) if not v]
             missing_fields = (set(none_model_fields) -
-                              set(new_class.declared_fields.keys()))
+                              set(cls.declared_fields.keys()))
             if missing_fields:
                 message = 'Unknown field(s) (%s) specified for %s'
                 message = message % (', '.join(missing_fields),
@@ -252,13 +254,11 @@ class ModelFormMetaclass(DeclarativeFieldsMetaclass):
                 raise FieldError(message)
             # Override default model fields with any custom declared ones
             # (plus, include all the other declared fields).
-            fields.update(new_class.declared_fields)
+            fields.update(cls.declared_fields)
         else:
-            fields = new_class.declared_fields
+            fields = cls.declared_fields
 
-        new_class.base_fields = fields
-
-        return new_class
+        cls.base_fields = fields
 
 
 class BaseModelForm(BaseForm):
@@ -456,7 +456,7 @@ class BaseModelForm(BaseForm):
     save.alters_data = True
 
 
-class ModelForm(six.with_metaclass(ModelFormMetaclass, BaseModelForm)):
+class ModelForm(ModelFormBase, BaseModelForm):
     pass
 
 

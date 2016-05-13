@@ -94,7 +94,7 @@ FORMFIELD_FOR_DBFIELD_DEFAULTS = {
 csrf_protect_m = method_decorator(csrf_protect)
 
 
-class BaseModelAdmin(six.with_metaclass(forms.MediaDefiningClass)):
+class BaseModelAdmin(forms.MediaDefiningBase):
     """Functionality common to both ModelAdmin and InlineAdmin."""
 
     raw_id_fields = ()

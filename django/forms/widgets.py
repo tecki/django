@@ -23,12 +23,13 @@ from django.utils.encoding import (
 )
 from django.utils.formats import get_format
 from django.utils.html import conditional_escape, format_html, html_safe
+from django.utils.metaclass import SubclassInit
 from django.utils.safestring import mark_safe
 from django.utils.six.moves import range
 from django.utils.translation import ugettext_lazy
 
 __all__ = (
-    'Media', 'MediaDefiningClass', 'Widget', 'TextInput', 'NumberInput',
+    'Media', 'MediaDefiningBase', 'Widget', 'TextInput', 'NumberInput',
     'EmailInput', 'URLInput', 'PasswordInput', 'HiddenInput',
     'MultipleHiddenInput', 'FileInput', 'ClearableFileInput', 'Textarea',
     'DateInput', 'DateTimeInput', 'TimeInput', 'CheckboxInput', 'Select',
@@ -145,17 +146,11 @@ def media_property(cls):
     return property(_media)
 
 
-class MediaDefiningClass(type):
-    """
-    Metaclass for classes that can have media definitions.
-    """
-    def __new__(mcs, name, bases, attrs):
-        new_class = super(MediaDefiningClass, mcs).__new__(mcs, name, bases, attrs)
-
-        if 'media' not in attrs:
-            new_class.media = media_property(new_class)
-
-        return new_class
+class MediaDefiningBase(SubclassInit):
+    def __init_subclass__(cls):
+        super(MediaDefiningBase, cls).__init_subclass__()
+        if 'media' not in cls.__dict__:
+            cls.media = media_property(cls)
 
 
 @html_safe
@@ -177,13 +172,11 @@ class SubWidget(object):
         return self.parent_widget.render(*args)
 
 
-class RenameWidgetMethods(MediaDefiningClass, RenameMethodsBase):
+class Widget(MediaDefiningBase, RenameMethodsBase):
     renamed_methods = (
         ('_format_value', 'format_value', RemovedInDjango20Warning),
     )
 
-
-class Widget(six.with_metaclass(RenameWidgetMethods)):
     needs_multipart_form = False  # Determines does this widget need multipart form
     is_localized = False
     is_required = False

@@ -13,7 +13,7 @@ from django.forms.boundfield import BoundField  # NOQA
 from django.forms.fields import Field, FileField
 # pretty_name is imported for backwards compatibility in Django 1.9
 from django.forms.utils import ErrorDict, ErrorList, pretty_name  # NOQA
-from django.forms.widgets import Media, MediaDefiningClass
+from django.forms.widgets import Media, MediaDefiningBase
 from django.utils import six
 from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.functional import cached_property
@@ -24,25 +24,22 @@ from django.utils.translation import ugettext as _
 __all__ = ('BaseForm', 'Form')
 
 
-class DeclarativeFieldsMetaclass(MediaDefiningClass):
-    """
-    Metaclass that collects Fields declared on the base classes.
-    """
-    def __new__(mcs, name, bases, attrs):
+class DeclarativeFieldsBase(MediaDefiningBase):
+    def __init_subclass__(cls):
         # Collect fields from current class.
         current_fields = []
-        for key, value in list(attrs.items()):
+        for key, value in list(cls.__dict__.items()):
             if isinstance(value, Field):
                 current_fields.append((key, value))
-                attrs.pop(key)
+                delattr(cls, key)
         current_fields.sort(key=lambda x: x[1].creation_counter)
-        attrs['declared_fields'] = OrderedDict(current_fields)
+        cls.declared_fields = OrderedDict(current_fields)
 
-        new_class = super(DeclarativeFieldsMetaclass, mcs).__new__(mcs, name, bases, attrs)
+        super(DeclarativeFieldsBase, cls).__init_subclass__()
 
         # Walk through the MRO.
         declared_fields = OrderedDict()
-        for base in reversed(new_class.__mro__):
+        for base in reversed(cls.__mro__):
             # Collect fields from base class.
             if hasattr(base, 'declared_fields'):
                 declared_fields.update(base.declared_fields)
@@ -52,10 +49,8 @@ class DeclarativeFieldsMetaclass(MediaDefiningClass):
                 if value is None and attr in declared_fields:
                     declared_fields.pop(attr)
 
-        new_class.base_fields = declared_fields
-        new_class.declared_fields = declared_fields
-
-        return new_class
+        cls.base_fields = declared_fields
+        cls.declared_fields = declared_fields
 
 
 @html_safe
@@ -484,7 +479,7 @@ class BaseForm(object):
         return [field for field in self if not field.is_hidden]
 
 
-class Form(six.with_metaclass(DeclarativeFieldsMetaclass, BaseForm)):
+class Form(DeclarativeFieldsBase, BaseForm):
     "A collection of Fields, plus their associated data."
     # This is a separate class from BaseForm in order to abstract the way
     # self.fields is specified. This class (Form) is the one that does the

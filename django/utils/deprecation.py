@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import inspect
 import warnings
+from .metaclass import SubclassInit
 
 
 class RemovedInDjango20Warning(DeprecationWarning):
@@ -32,7 +33,7 @@ class warn_about_renamed_method(object):
         return wrapped
 
 
-class RenameMethodsBase(type):
+class RenameMethodsBase(SubclassInit):
     """
     Handles the deprecation paths when renaming a method.
 
@@ -46,10 +47,10 @@ class RenameMethodsBase(type):
 
     renamed_methods = ()
 
-    def __new__(cls, name, bases, attrs):
-        new_class = super(RenameMethodsBase, cls).__new__(cls, name, bases, attrs)
+    def __init_subclass__(cls):
+        super().__init_subclass__()
 
-        for base in inspect.getmro(new_class):
+        for base in inspect.getmro(cls):
             class_name = base.__name__
             for renamed_method in cls.renamed_methods:
                 old_method_name = renamed_method[0]
@@ -71,8 +72,6 @@ class RenameMethodsBase(type):
                 # Define the old method as a wrapped call to the new method.
                 if not old_method and new_method:
                     setattr(base, old_method_name, wrapper(new_method))
-
-        return new_class
 
 
 class DeprecationInstanceCheck(type):
