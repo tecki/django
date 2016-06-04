@@ -105,11 +105,12 @@ class Meta(type):
         if method is not None:
             ns["__init_subclass__"] = classmethod(method)
         ns["__attribute_order__"] = tuple(ns.keys())
-        return super(Meta, cls).__new__(cls, name, bases, ns)
+        ret = super(Meta, cls).__new__(cls, name, bases, ns)
+        super(ret, ret).__init_subclass__(**kwargs)
+        return ret
 
     def __init__(self, name, bases, ns, **kwargs):
         super(Meta, self).__init__(name, bases, ns)
-        super(self, self).__init_subclass__(**kwargs)
         for k, v in ns.items():
             if hasattr(v, "__init_descriptor__"):
                 v.__init_descriptor__(self, k)
