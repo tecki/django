@@ -16,7 +16,7 @@ from django.utils import datetime_safe, formats, six
 from django.utils.datastructures import MultiValueDict
 from django.utils.dates import MONTHS
 from django.utils.deprecation import (
-    RemovedInDjango20Warning, RenameMethodsBase,
+    RemovedInDjango20Warning, RenameMethods,
 )
 from django.utils.encoding import (
     force_str, force_text, python_2_unicode_compatible,
@@ -172,7 +172,7 @@ class SubWidget(object):
         return self.parent_widget.render(*args)
 
 
-class Widget(MediaDefiningBase, RenameMethodsBase):
+class Widget(MediaDefiningBase, RenameMethods):
     renamed_methods = (
         ('_format_value', 'format_value', RemovedInDjango20Warning),
     )
