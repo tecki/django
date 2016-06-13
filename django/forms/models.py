@@ -20,7 +20,7 @@ from django.forms.widgets import (
 )
 from django.utils import six
 from django.utils.encoding import force_text, smart_text
-from django.utils.metaclass import Meta
+from django.utils.metaclass import Type
 from django.utils.text import capfirst, get_text_list
 from django.utils.translation import ugettext, ugettext_lazy as _
 
@@ -457,7 +457,7 @@ class ModelForm(DeclarativeFieldsBase, BaseModelForm):
         cls.base_fields = fields
 
 
-class ModelFormMetaclass(Meta):
+class ModelFormMetaclass(Type):
     pass
 
 

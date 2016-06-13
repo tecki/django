@@ -23,7 +23,7 @@ from django.utils.encoding import (
 )
 from django.utils.formats import get_format
 from django.utils.html import conditional_escape, format_html, html_safe
-from django.utils.metaclass import SubclassInit
+from django.utils.metaclass import Object
 from django.utils.safestring import mark_safe
 from django.utils.six.moves import range
 from django.utils.translation import ugettext_lazy
@@ -146,7 +146,7 @@ def media_property(cls):
     return property(_media)
 
 
-class MediaDefiningBase(SubclassInit):
+class MediaDefiningBase(Object):
     def __init_subclass__(cls):
         super(MediaDefiningBase, cls).__init_subclass__()
         if 'media' not in cls.__dict__:
